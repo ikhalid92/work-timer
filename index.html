@@ -85,10 +85,11 @@
             justify-content: space-between;
             padding: 10px 0;
             border-bottom: 1px solid #eee;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
-        .hidden { display: none; }
+        .hidden { display: none !important; }
+        .reset-link { color: #ccc; font-size: 0.7rem; text-decoration: none; display: block; text-align: center; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -116,41 +117,52 @@
         </div>
 
         <button id="btnIn" class="btn-start" onclick="handleIn()">Check In</button>
-        <button id="btnOut" class="btn-break hidden" onclick="handleBreak()">Cafeteria / Break Out</button>
-        <button id="btnResume" class="btn-start hidden" onclick="handleResume()">Back to Work</button>
+        <button id="btnOut" class="btn-break hidden" onclick="handleBreak()">Go to Cafeteria</button>
+        <button id="btnResume" class="btn-start hidden" onclick="handleResume()">Resume Work</button>
         <button id="btnFinish" class="btn-finish hidden" onclick="handleFinish()">Finish & Save Day</button>
+        
+        <a href="#" class="reset-link" onclick="forceReset()">Emergency App Reset</a>
     </div>
 
     <div class="history-card">
         <h3 style="margin-top:0">History</h3>
         <div id="historyList"></div>
-        <button onclick="clearHistory()" style="background:none; color:red; font-size:0.7rem; padding:5px;">Clear History</button>
+        <button onclick="clearHistory()" style="background:none; color:red; font-size:0.7rem; padding:15px 5px 5px 5px; margin:0;">Clear History</button>
     </div>
 </div>
 
 <script>
-    let state = JSON.parse(localStorage.getItem('workAppState')) || {
+    // Initialize State
+    let state = {
         start: null,
         breaks: 0,
         breakStart: null,
-        mode: 'OFF', // OFF, WORKING, BREAK
+        mode: 'OFF',
         history: []
     };
+
+    // Load from LocalStorage
+    const saved = localStorage.getItem('workAppState');
+    if (saved) {
+        state = JSON.parse(saved);
+    }
 
     function updateUI() {
         const { start, breaks, mode, history } = state;
         
         // Update Stats
         document.getElementById('startVal').innerText = start ? formatTime(new Date(start)) : '--:--';
-        document.getElementById('breakVal').innerText = breaks + ' min';
+        document.getElementById('breakVal').innerText = (breaks || 0) + ' min';
 
-        // Calculate Exit Time
+        // Calculate Exit Time (8 Hours + Breaks)
         if (start) {
             const exit = new Date(new Date(start).getTime() + (8 * 60 * 60 * 1000) + (breaks * 60 * 1000));
             document.getElementById('exitTime').innerText = formatTime(exit);
+        } else {
+            document.getElementById('exitTime').innerText = '--:--';
         }
 
-        // Toggle Buttons
+        // Toggle Buttons - Explicit Logic
         document.getElementById('btnIn').classList.toggle('hidden', mode !== 'OFF');
         document.getElementById('btnOut').classList.toggle('hidden', mode !== 'WORKING');
         document.getElementById('btnResume').classList.toggle('hidden', mode !== 'BREAK');
@@ -158,50 +170,60 @@
 
         // Render History
         const histList = document.getElementById('historyList');
-        histList.innerHTML = history.map(day => `
-            <div class="history-item">
-                <span><b>${day.date}</b></span>
-                <span>${day.start} - ${day.end} (${day.breaks}m break)</span>
-            </div>
-        `).reverse().join('');
+        if (history && history.length > 0) {
+            histList.innerHTML = history.map(day => `
+                <div class="history-item">
+                    <span><b>${day.date}</b></span>
+                    <span>${day.start} - ${day.end} (${day.breaks}m)</span>
+                </div>
+            `).reverse().join('');
+        } else {
+            histList.innerHTML = '<p style="color:#ccc; font-size:0.8rem">No records yet.</p>';
+        }
 
+        // Always Save
         localStorage.setItem('workAppState', JSON.stringify(state));
     }
 
     function handleIn() {
-        state.start = new Date();
+        state.start = new Date().toISOString();
         state.mode = 'WORKING';
+        state.breaks = 0;
         updateUI();
     }
 
     function handleBreak() {
-        state.breakStart = new Date();
+        state.breakStart = new Date().toISOString();
         state.mode = 'BREAK';
         updateUI();
     }
 
     function handleResume() {
-        const diff = Math.round((new Date() - new Date(state.breakStart)) / 60000);
-        state.breaks += diff;
+        if (state.breakStart) {
+            const diff = Math.round((new Date() - new Date(state.breakStart)) / 60000);
+            state.breaks = (state.breaks || 0) + diff;
+        }
         state.breakStart = null;
         state.mode = 'WORKING';
         updateUI();
     }
 
     function handleFinish() {
-        if (!confirm("Finish work for today?")) return;
+        if (!confirm("Save this record and finish the day?")) return;
         
-        const exit = document.getElementById('exitTime').innerText;
+        const exitText = document.getElementById('exitTime').innerText;
         const today = new Date().toLocaleDateString();
+        
+        if (!state.history) state.history = [];
         
         state.history.push({
             date: today,
             start: formatTime(new Date(state.start)),
-            end: exit,
+            end: exitText,
             breaks: state.breaks
         });
 
-        // Reset for next day
+        // Reset Day
         state.start = null;
         state.breaks = 0;
         state.mode = 'OFF';
@@ -212,55 +234,25 @@
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    function clearHistory() { if(confirm("Clear history?")) { state.history = []; updateUI(); } }
+    function clearHistory() { 
+        if(confirm("Permanently delete your history?")) { 
+            state.history = []; 
+            updateUI(); 
+        } 
+    }
 
+    function forceReset() {
+        if(confirm("This will fix the buttons if they are stuck. Your history will be kept. Proceed?")) {
+            state.mode = 'OFF';
+            state.start = null;
+            state.breaks = 0;
+            updateUI();
+        }
+    }
+
+    // Run once on load
     updateUI();
 </script>
 
-</body>
-</html>
-
-    <script>
-        let breakMinutes = parseInt(localStorage.getItem('breakMins')) || 0;
-        let isOnBreak = false;
-        let breakInterval;
-
-        function updateUI() {
-            let leaveDate = new Date();
-            leaveDate.setHours(8, 30, 0); // Your 8:30 start
-            leaveDate.setHours(leaveDate.getHours() + 8);
-            leaveDate.setMinutes(leaveDate.getMinutes() + breakMinutes);
-
-            document.getElementById('leaveTime').textContent = leaveDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            document.getElementById('breakDisplay').textContent = breakMinutes + " mins";
-            localStorage.setItem('breakMins', breakMinutes);
-        }
-
-        document.getElementById('breakBtn').onclick = function() {
-            isOnBreak = !isOnBreak;
-            if (isOnBreak) {
-                this.textContent = "Back from Break";
-                this.classList.add('active');
-                breakInterval = setInterval(() => {
-                    breakMinutes++;
-                    updateUI();
-                }, 60000);
-            } else {
-                this.textContent = "Go to Break";
-                this.classList.remove('active');
-                clearInterval(breakInterval);
-            }
-        };
-
-        document.getElementById('resetBtn').onclick = function() {
-            if(confirm("Reset break time to zero?")) {
-                clearInterval(breakInterval);
-                breakMinutes = 0;
-                updateUI();
-            }
-        };
-
-        updateUI();
-    </script>
 </body>
 </html>
