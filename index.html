@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Work Timer</title>
+    <style>
+        :root { --primary: #e65100; --bg: #f8f9fa; --card: #ffffff; --text: #2c3e50; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
+        .card { background: var(--card); width: 100%; max-width: 350px; padding: 30px; border-radius: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); text-align: center; }
+        .leave-box { background-color: #e8f7f0; padding: 20px; border-radius: 15px; margin-bottom: 20px; }
+        .time-display { color: #2e7d32; font-size: 36px; font-weight: 800; margin-top: 5px; }
+        .stats { background-color: #f1f4f8; padding: 15px; border-radius: 15px; margin-bottom: 25px; }
+        .row { display: flex; justify-content: space-between; margin: 10px 0; font-size: 15px; }
+        .btn-main { background-color: var(--primary); color: white; border: none; width: 100%; padding: 16px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; transition: 0.3s; -webkit-tap-highlight-color: transparent; }
+        .btn-main.active { background-color: #2c3e50; }
+        .btn-reset { background: none; border: none; color: #95a5a6; margin-top: 25px; cursor: pointer; font-size: 13px; text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Work Schedule</h2>
+        <div class="leave-box">
+            <div style="color:#2e7d32; font-size:11px; font-weight:bold; letter-spacing:1px;">ESTIMATED LEAVE TIME</div>
+            <div id="leaveTime" class="time-display">--:--</div>
+        </div>
+
+        <div class="stats">
+            <div class="row"><span>Start:</span><span id="startDisplay" style="font-weight:bold;">08:30 AM</span></div>
+            <div class="row"><span>Break Total:</span><span id="breakDisplay" style="font-weight:bold;">0 mins</span></div>
+        </div>
+
+        <button id="breakBtn" class="btn-main">Go to Break</button>
+        <button id="resetBtn" class="btn-reset">Reset Everything</button>
+    </div>
+
+    <script>
+        let breakMinutes = parseInt(localStorage.getItem('breakMins')) || 0;
+        let isOnBreak = false;
+        let breakInterval;
+
+        function updateUI() {
+            let leaveDate = new Date();
+            leaveDate.setHours(8, 30, 0); // Your 8:30 start
+            leaveDate.setHours(leaveDate.getHours() + 8);
+            leaveDate.setMinutes(leaveDate.getMinutes() + breakMinutes);
+
+            document.getElementById('leaveTime').textContent = leaveDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            document.getElementById('breakDisplay').textContent = breakMinutes + " mins";
+            localStorage.setItem('breakMins', breakMinutes);
+        }
+
+        document.getElementById('breakBtn').onclick = function() {
+            isOnBreak = !isOnBreak;
+            if (isOnBreak) {
+                this.textContent = "Back from Break";
+                this.classList.add('active');
+                breakInterval = setInterval(() => {
+                    breakMinutes++;
+                    updateUI();
+                }, 60000);
+            } else {
+                this.textContent = "Go to Break";
+                this.classList.remove('active');
+                clearInterval(breakInterval);
+            }
+        };
+
+        document.getElementById('resetBtn').onclick = function() {
+            if(confirm("Reset break time to zero?")) {
+                clearInterval(breakInterval);
+                breakMinutes = 0;
+                updateUI();
+            }
+        };
+
+        updateUI();
+    </script>
+</body>
+</html>
